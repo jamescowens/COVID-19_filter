@@ -165,8 +165,8 @@ public:
 
             v_datetime = split(v_line[2], " ");
 
-            if (fDebug) PrintToConsole("v_datetime[0] = " + v_datetime[0]);
-            if (fDebug) PrintToConsole("v_datetime[1] = " + v_datetime[1]);
+            if (fDebug) PrintToConsole("INFO: v_datetime[0] = " + v_datetime[0]);
+            if (fDebug) PrintToConsole("INFO: v_datetime[1] = " + v_datetime[1]);
 
             // The date for version 0 has slashes.
             v_date = split(v_datetime[0], "/");
@@ -176,7 +176,7 @@ public:
             if (v_date[2].size() < 4) century = "20";
             datetime = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1] + " " + v_datetime[1];
 
-            if (fDebug) PrintToConsole("datetime = " + datetime);
+            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
 
             Last_Update = boost::posix_time::time_from_string(datetime);
 
@@ -201,12 +201,12 @@ public:
 
             v_datetime = split(v_line[2], "T");
 
-            if (fDebug) PrintToConsole("v_datetime[0] = " + v_datetime[0]);
+            if (fDebug) PrintToConsole("INFO: v_datetime[0] = " + v_datetime[0]);
 
             // The date is already in the right order.
             datetime = v_datetime[0] + " " + v_datetime[1];
 
-            if (fDebug) PrintToConsole("datetime = " + datetime);
+            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
 
             Last_Update = boost::posix_time::time_from_string(datetime);
 
@@ -226,8 +226,8 @@ public:
 
             v_datetime = split(v_line[4], " ");
 
-            if (fDebug) PrintToConsole("v_datetime[0] = " + v_datetime[0]);
-            if (fDebug) PrintToConsole("v_datetime[1] = " + v_datetime[1]);
+            if (fDebug) PrintToConsole("INFO: v_datetime[0] = " + v_datetime[0]);
+            if (fDebug) PrintToConsole("INFO: v_datetime[1] = " + v_datetime[1]);
 
             // The date for version 0 has slashes.
             v_date = split(v_datetime[0], "/");
@@ -237,7 +237,7 @@ public:
             if (v_date[2].size() < 4) century = "20";
             datetime = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1] + " " + v_datetime[1];
 
-            if (fDebug) PrintToConsole("datetime = " + datetime);
+            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
 
             Last_Update = boost::posix_time::time_from_string(datetime);
             Date = Last_Update.date();
@@ -264,7 +264,7 @@ public:
             // The date is already in the right order.
             datetime = v_datetime[0] + " " + v_datetime[1];
 
-            if (fDebug) PrintToConsole("datetime = " + datetime);
+            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
 
             Last_Update = boost::posix_time::time_from_string(datetime);
             Date = Last_Update.date();
@@ -322,25 +322,25 @@ public:
 
     unsigned int GetVersion(boost::gregorian::date file_date)
     {
-        unsigned int version;
+        // Initial version is 0.
+        unsigned int version = 0;
 
-        if (file_date <= boost::gregorian::date(2020,2,01))
-        {
-            version = 0;
-        }
-        else if (file_date > boost::gregorian::date(2020,2,01) && file_date <= boost::gregorian::date(2020,2,29))
+        if (file_date >= boost::gregorian::date(2020,2,2))
         {
             version = 1;
         }
-        else if (file_date > boost::gregorian::date(2020,2,29) && file_date <= boost::gregorian::date(2020,3,21))
+
+        if (file_date >= boost::gregorian::date(2020,3,1))
         {
             version = 2;
         }
-        else if (file_date == boost::gregorian::date(2020,3,22))
+
+        if (file_date >= boost::gregorian::date(2020,3,22))
         {
             version = 3;
         }
-        else
+
+        if (file_date >= boost::gregorian::date(2020,3,23))
         {
             version = 4;
         }
@@ -605,7 +605,7 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
             std::string output_string;
             if (row.second.ToString(",", output_string))
             {
-                PrintToConsole("INFO: output string = " + output_string);
+                if (fDebug) PrintToConsole("INFO: output string = " + output_string);
                 outfile << output_string << endl;
             }
             else
@@ -625,7 +625,7 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
 
 int main()
 {
-    int status = false;
+    int error = false;
 
     fs::path source_path;
     fs::path destination_path;
@@ -650,7 +650,7 @@ int main()
 
     source_file_type.push_back(std::make_pair("daily", ""));
 
-    PrintToConsole("INFO: source file type count = " + std::to_string(source_file_type.size()));
+    if (fDebug) PrintToConsole("INFO: source file type count = " + std::to_string(source_file_type.size()));
 
     // Start with a fresh file at first.
     bool append = false;
@@ -663,7 +663,7 @@ int main()
 
         if (source_file_spec_entry == source_file_spec.end())
         {
-            PrintToConsole("INFO: Invalid source file spec, aborting.");
+            PrintToConsole("ERROR: Invalid source file spec, aborting.");
             return 1;
         }
 
@@ -671,7 +671,7 @@ int main()
 
         if (destination_file_spec_entry == destination_file_spec.end())
         {
-            PrintToConsole("INFO: Invalid destination file spec, aborting.");
+            PrintToConsole("ERROR: Invalid destination file spec, aborting.");
             return 1;
         }
 
@@ -684,7 +684,7 @@ int main()
             PrintToConsole("INFO: Processing source " + source_path.filename().string()
                            + " to destination " + destination_path.filename().string());
 
-            status = !ProcessSourceFile(source_path, entry, destination_path, false, append);
+            error = !ProcessSourceFile(source_path, entry, destination_path, false, append);
 
             // Append for each additional pass.
             append = true;
@@ -724,7 +724,8 @@ int main()
                 catch (...)
                 {
                     PrintToConsole("ERROR: Date parse from filename invalid.");
-                    status = true;
+                    error = true;
+                    continue;
                 }
 
                 boost::gregorian::date date(year, month, day);
@@ -745,17 +746,25 @@ int main()
                 PrintToConsole("INFO: Processing source " + dir_entry.second.path().filename().string()
                                + " to map");
 
-                status = !ProcessSourceFile(dir_entry.second.path(), entry, destination_path, false);
+                // If a file fails to process, flag the error and continue to iterate.
+                error = error || !ProcessSourceFile(dir_entry.second.path(), entry, destination_path, false);
             }
 
             PrintToConsole("INFO: Processing map to destination " + destination_path.filename().string());
 
             // Write the map to file
-            status = !ProcessSourceFile(fs::path {}, entry, destination_path, true, false);
+            error = error || !ProcessSourceFile(fs::path {}, entry, destination_path, true, false);
         }
     }
 
-    PrintToConsole("INFO: Return code is " + std::to_string(status));
+    if (!error)
+    {
+        PrintToConsole("INFO: Execution successful.\n" + std::to_string(error));
+    }
+    else
+    {
+        PrintToConsole("ERROR: Execution failed.\n" + std::to_string(error));
+    }
 
-    return status;
+    return error;
 }
