@@ -1,0 +1,3 @@
+export LD_LIBRARY_PATH=/home/jco/local/boost/lib:/usr/gcc73/lib64:/home/jco/local/llvm/lib:/home/jco/Qt/lib:/home/jco/local/jsoncpp/lib64:/home/jco/local/openssl/lib:/home/jco/local/curl/lib64:/home/jco/local/expat/lib64/:/home/jco/local/lib64:/home/jco/local/lib
+export QT_PLUGIN_PATH=/home/jco/Qt/plugins:$QT_PLUGIN_PATH
+export PATH=/usr/gcc73/bin:/home/jco/local/llvm/bin:/home/jco/local/cmake/bin:/home/jco/local/bin:/home/jco/local/git/bin:/home/jco/local/expat/bin:/home/jco/local/cmake/bin:/home/jco/Qt/bin:/home/jco/local/openssl/bin:/home/jco/local/curl/bin:/home/jco/QtCreator/bin:$PATH
