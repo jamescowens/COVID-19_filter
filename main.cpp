@@ -575,6 +575,36 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
             return true;
         }
 
+        // This uses the daily_data_record object for the head "intraday" file.
+        else if (source_file_type_entry.first == "intraday")
+        {
+            // This gets the date of the intraday file from the last write time of the file.
+            boost::gregorian::date date(boost::posix_time::from_time_t(fs::last_write_time(source_file)).date());
+
+            // We throw the original header in the source file away, because several versions
+            // are being merged into a single structure.
+            // Now the data...
+            while (std::getline(filtered_infile, line))
+            {
+                if (fDebug) PrintToConsole("INFO: line = " + line);
+
+                // Form the record object from the data file input line. Note
+                // that the versioning is implicitely determined by the fed in date from
+                // the filename.
+                daily_data_record record(date, line);
+
+                // Insert into the global map. Using the [] operator, and having the key have
+                //  the Date member, ensures that when there are multiple records on the same day,
+                // the latest record will replace the earlier for the same geographic combination,
+                // which is what we want.
+                daily_data_record::map_daily_data_record[record.GetKey()] = record;
+            }
+
+            PrintToConsole("INFO: map_daily_data_record.size() = " + std::to_string(daily_data_record::map_daily_data_record.size()));
+
+            return true;
+        }
+
     }
 
     // If output_map_to_file is true, this indicates the map is completely loaded and
@@ -629,17 +659,19 @@ int main()
 
     fs::path source_path;
     fs::path destination_path;
-    fs::path data_dir = "/home/jco/builds/COVID-19/csse_covid_19_data/";
+    fs::path data_dir = "/home/jco/builds/";
 
     std::map<std::string, std::pair<std::string, std::string>> source_file_spec;
     std::map<std::string, std::pair<std::string, std::string>> destination_file_spec;
     std::vector<std::pair<std::string, std::string>> source_file_type;
 
-    source_file_spec["global"] = std::make_pair("csse_covid_19_time_series/time_series_covid19_", "_global.csv");
-    source_file_spec["daily"] = std::make_pair("csse_covid_19_daily_reports", ".csv");
+    source_file_spec["global"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_", "_global.csv");
+    source_file_spec["daily"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_daily_reports", ".csv");
+    source_file_spec["intraday"] = std::make_pair("COVID-19_web-data/data/", ".csv");
 
-    destination_file_spec["global"] = std::make_pair("csse_covid_19_time_series/filtered_", "_output.csv");
-    destination_file_spec["daily"] = std::make_pair("csse_covid_19_daily_reports/filtered_", "_output.csv");
+    destination_file_spec["global"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_time_series/filtered_", "_output.csv");
+    destination_file_spec["daily"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/filtered_", "_output.csv");
+    destination_file_spec["intraday"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/filtered_", "_output.csv");
 
     // A little kludgy. The global files are three different categories,
     // while the daily files are one per day and taken care of with an
@@ -649,6 +681,10 @@ int main()
     source_file_type.push_back(std::make_pair("global", "recovered"));
 
     source_file_type.push_back(std::make_pair("daily", ""));
+
+    // The intraday update is from the web-data tag branch and is in the same format as the daily files, but
+    // with the name "cases".
+    source_file_type.push_back(std::make_pair("intraday", "cases"));
 
     if (fDebug) PrintToConsole("INFO: source file type count = " + std::to_string(source_file_type.size()));
 
@@ -675,16 +711,15 @@ int main()
             return 1;
         }
 
-        destination_path = data_dir / (fs::path) (destination_file_spec_entry->second.first + entry.first + destination_file_spec_entry->second.second);
-
         if (entry.first == "global")
         {
             source_path = data_dir / (fs::path) (source_file_spec_entry->second.first + entry.second + source_file_spec_entry->second.second);
+            destination_path = data_dir / (fs::path) (destination_file_spec_entry->second.first + entry.first + destination_file_spec_entry->second.second);
 
             PrintToConsole("INFO: Processing source " + source_path.filename().string()
                            + " to destination " + destination_path.filename().string());
 
-            error = !ProcessSourceFile(source_path, entry, destination_path, false, append);
+            error = error || !ProcessSourceFile(source_path, entry, destination_path, false, append);
 
             // Append for each additional pass.
             append = true;
@@ -693,6 +728,7 @@ int main()
         {
             // Set source path to the directory to be iterated through for the daily files
             source_path = data_dir / source_file_spec_entry->second.first;
+            destination_path = data_dir / (fs::path) (destination_file_spec_entry->second.first + entry.first + destination_file_spec_entry->second.second);
 
             // We need to order the files properly
             std::map<boost::gregorian::date, fs::directory_entry> sorted_directory_map;
@@ -750,6 +786,24 @@ int main()
                 error = error || !ProcessSourceFile(dir_entry.second.path(), entry, destination_path, false);
             }
 
+            // Note we do not write the map out here because we need the intraday included first.
+        }
+        else if (entry.first == "intraday")
+        {
+            // Set source path for the intraday file.
+            source_path = data_dir / (fs::path) (source_file_spec_entry->second.first + entry.second + source_file_spec_entry->second.second);
+
+            // The destination path here is put on top of the daily output, because the intraday update is really the "head"
+            // of the daily files...
+            destination_path = data_dir / (fs::path) (destination_file_spec_entry->second.first + "daily" + destination_file_spec_entry->second.second);
+
+            PrintToConsole("INFO: Processing source " + source_path.filename().string()
+                           + " to map");
+
+            // If a file fails to process, flag the error and continue to iterate.
+            error = error || !ProcessSourceFile(source_path, entry, destination_path, false);
+
+            // Write daily + intraday update map to file
             PrintToConsole("INFO: Processing map to destination " + destination_path.filename().string());
 
             // Write the map to file
