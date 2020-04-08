@@ -14,6 +14,9 @@
 #include <map>
 #include <algorithm>
 #include<bits/stdc++.h>
+#include <stdlib.h>
+#include <string.h>
+
 
 using namespace std;
 
@@ -22,7 +25,188 @@ namespace boostio = boost::iostreams;
 
 bool fDebug = false;
 
+struct mapArgscomp
+{
+   bool operator() (const std::string& lhs, const std::string& rhs) const
+   {
+       return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
+   }
+};
+
+typedef std::map<std::string, std::string, mapArgscomp> ArgsMap;
+typedef std::map<std::string, std::vector<std::string>, mapArgscomp> ArgsMultiMap;
+
+ArgsMap mapArgs;
+ArgsMultiMap mapMultiArgs;
+
+inline size_t strlcpy(char *dst, const char *src, size_t siz);
+int64_t atoi64(const char* psz);
+int64_t atoi64(const std::string& str);
+int atoi(const std::string& str);
+static void InterpretNegativeSetting(string name, ArgsMap& mapSettingsRet);
+void ParseParameters(int argc, const char* const argv[]);
+std::string GetArgument(const std::string& arg, const std::string& defaultvalue);
+void SetArgument(const string &argKey, const string &argValue);
+std::string GetArg(const std::string& strArg, const std::string& strDefault);
+bool GetBoolArg(const std::string& strArg, bool fDefault = false);
+
 /* Utility functions */
+
+/*
+ * Copy src to string dst of size siz.  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz == 0).
+ * Returns strlen(src); if retval >= siz, truncation occurred.
+ */
+inline size_t strlcpy(char *dst, const char *src, size_t siz)
+{
+    char *d = dst;
+    const char *s = src;
+    size_t n = siz;
+
+    /* Copy as many bytes as will fit */
+    if (n != 0)
+    {
+        while (--n != 0)
+        {
+            if ((*d++ = *s++) == '\0')
+                break;
+        }
+    }
+
+    /* Not enough room in dst, add NUL and traverse rest of src */
+    if (n == 0)
+    {
+        if (siz != 0)
+            *d = '\0';  /* NUL-terminate dst */
+        while (*s++)
+            ;
+    }
+
+    return(s - src - 1); /* count does not include NUL */
+}
+
+
+int64_t atoi64(const char* psz)
+{
+#ifdef _MSC_VER
+    return _atoi64(psz);
+#else
+    return strtoll(psz, nullptr, 10);
+#endif
+}
+
+int64_t atoi64(const std::string& str)
+{
+#ifdef _MSC_VER
+    return _atoi64(str.c_str());
+#else
+    return strtoll(str.c_str(), nullptr, 10);
+#endif
+}
+
+int atoi(const std::string& str)
+{
+    return atoi(str.c_str());
+}
+
+static void InterpretNegativeSetting(string name, ArgsMap& mapSettingsRet)
+{
+    // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
+    if (name.find("-no") == 0)
+    {
+        std::string positive("-");
+        positive.append(name.begin()+3, name.end());
+        if (mapSettingsRet.count(positive) == 0)
+        {
+            bool value = !GetBoolArg(name);
+            mapSettingsRet[positive] = (value ? "1" : "0");
+        }
+    }
+}
+
+void ParseParameters(int argc, const char* const argv[])
+{
+    mapArgs.clear();
+    mapMultiArgs.clear();
+    for (int i = 1; i < argc; i++)
+    {
+        char psz[10000];
+        strlcpy(psz, argv[i], sizeof(psz));
+        char* pszValue = (char*)"";
+        if (strchr(psz, '='))
+        {
+            pszValue = strchr(psz, '=');
+            *pszValue++ = '\0';
+        }
+        #ifdef WIN32
+        _strlwr(psz);
+        if (psz[0] == '/')
+            psz[0] = '-';
+        #endif
+        if (psz[0] != '-')
+            break;
+
+        mapArgs[psz] = pszValue;
+        mapMultiArgs[psz].push_back(pszValue);
+    }
+
+    for (auto const& entry : mapArgs)
+    {
+        string name = entry.first;
+
+        //  interpret --foo as -foo (as long as both are not set)
+        if (name.find("--") == 0)
+        {
+            std::string singleDash(name.begin()+1, name.end());
+            if (mapArgs.count(singleDash) == 0)
+                mapArgs[singleDash] = entry.second;
+            name = singleDash;
+        }
+
+        // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
+        InterpretNegativeSetting(name, mapArgs);
+    }
+}
+
+std::string GetArgument(const std::string& arg, const std::string& defaultvalue)
+{
+    if (mapArgs.count("-" + arg))
+        return mapArgs["-" + arg];
+
+    return defaultvalue;
+}
+
+// SetArgument - Set or alter arguments stored in memory
+void SetArgument(const string &argKey, const string &argValue)
+{
+    mapArgs["-" + argKey] = argValue;
+}
+
+std::string GetArg(const std::string& strArg, const std::string& strDefault)
+{
+    if (mapArgs.count(strArg))
+        return mapArgs[strArg];
+    return strDefault;
+}
+
+int64_t GetArg(const std::string& strArg, int64_t nDefault)
+{
+    if (mapArgs.count(strArg))
+        return atoi64(mapArgs[strArg]);
+    return nDefault;
+}
+
+bool GetBoolArg(const std::string& strArg, bool fDefault)
+{
+    if (mapArgs.count(strArg))
+    {
+        if (mapArgs[strArg].empty())
+            return true;
+        return (atoi(mapArgs[strArg]) != 0);
+    }
+    return fDefault;
+}
+
 
 void PrintToConsole(std::string string)
 {
@@ -226,16 +410,21 @@ public:
 
             v_datetime = split(v_line[4], " ");
 
-            if (fDebug) PrintToConsole("INFO: v_datetime[0] = " + v_datetime[0]);
-            if (fDebug) PrintToConsole("INFO: v_datetime[1] = " + v_datetime[1]);
+            if (v_line[4].find("/") != std::string::npos)
+            {
+                // The date has slashes.
+                v_date = split(v_datetime[0], "/");
 
-            // The date for version 0 has slashes.
-            v_date = split(v_datetime[0], "/");
-
-            // Change the date order to yyyy-m-d and add time.
-
-            if (v_date[2].size() < 4) century = "20";
-            datetime = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1] + " " + v_datetime[1];
+                // Change the date order to yyyy-m-d and add time.
+                if (v_date[2].size() < 4) century = "20";
+                datetime = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1] + " " + v_datetime[1];
+            }
+            else if (v_line[4].find("-") != std::string::npos)
+            {
+                // the date has dashes and is already in the right order.
+                datetime = v_datetime[0] + " " + v_datetime[1];
+            }
+            else throw exception();
 
             if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
 
@@ -253,30 +442,6 @@ public:
 
             break;
 
-        case 4:
-            FIPS = v_line[0];
-            Admin2 = v_line[1];
-            Province_State = v_line[2];
-            Country_Region = v_line[3];
-
-            v_datetime = split(v_line[4], " ");
-
-            // The date is already in the right order.
-            datetime = v_datetime[0] + " " + v_datetime[1];
-
-            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
-
-            Last_Update = boost::posix_time::time_from_string(datetime);
-            Date = Last_Update.date();
-
-            Lat = StringToDouble(v_line[5]);
-            Long = StringToDouble(v_line[6]);
-            Confirmed = StringToInt(v_line[7]);
-            Deaths = StringToInt(v_line[8]);
-            Recovered = StringToInt(v_line[9]);
-            Active = StringToInt(v_line[10]);
-
-            Combined_Key = v_line[11];
         }
 
     }
@@ -338,11 +503,6 @@ public:
         if (file_date >= boost::gregorian::date(2020,3,22))
         {
             version = 3;
-        }
-
-        if (file_date >= boost::gregorian::date(2020,3,23))
-        {
-            version = 4;
         }
 
         return version;
@@ -554,20 +714,28 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
             // We throw the original header in the source file away, because several versions
             // are being merged into a single structure.
             // Now the data...
+            unsigned int linenumber = 2;
             while (std::getline(filtered_infile, line))
             {
                 if (fDebug) PrintToConsole("INFO: line = " + line);
 
-                // Form the record object from the data file input line. Note
-                // that the versioning is implicitely determined by the fed in date from
-                // the filename.
-                daily_data_record record(date, line);
+                try
+                {
+                    daily_data_record record(date, line);
 
-                // Insert into the global map. Using the [] operator, and having the key have
-                //  the Date member, ensures that when there are multiple records on the same day,
-                // the latest record will replace the earlier for the same geographic combination,
-                // which is what we want.
-                daily_data_record::map_daily_data_record[record.GetKey()] = record;
+                    // Insert into the global map. Using the [] operator, and having the key have
+                    //  the Date member, ensures that when there are multiple records on the same day,
+                    // the latest record will replace the earlier for the same geographic combination,
+                    // which is what we want.
+                    daily_data_record::map_daily_data_record[record.GetKey()] = record;
+
+                }
+                catch (...)
+                {
+                    PrintToConsole("ERROR: Something went wrong with map insert at line number " + std::to_string(linenumber));
+                }
+
+                ++linenumber;
             }
 
             PrintToConsole("INFO: map_daily_data_record.size() = " + std::to_string(daily_data_record::map_daily_data_record.size()));
@@ -584,6 +752,8 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
             // We throw the original header in the source file away, because several versions
             // are being merged into a single structure.
             // Now the data...
+
+            unsigned int linenumber = 2;
             while (std::getline(filtered_infile, line))
             {
                 if (fDebug) PrintToConsole("INFO: line = " + line);
@@ -591,13 +761,24 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
                 // Form the record object from the data file input line. Note
                 // that the versioning is implicitely determined by the fed in date from
                 // the filename.
-                daily_data_record record(date, line);
 
-                // Insert into the global map. Using the [] operator, and having the key have
-                //  the Date member, ensures that when there are multiple records on the same day,
-                // the latest record will replace the earlier for the same geographic combination,
-                // which is what we want.
-                daily_data_record::map_daily_data_record[record.GetKey()] = record;
+                try
+                {
+                    daily_data_record record(date, line);
+
+                    // Insert into the global map. Using the [] operator, and having the key have
+                    //  the Date member, ensures that when there are multiple records on the same day,
+                    // the latest record will replace the earlier for the same geographic combination,
+                    // which is what we want.
+                    daily_data_record::map_daily_data_record[record.GetKey()] = record;
+
+                }
+                catch (...)
+                {
+                    PrintToConsole("ERROR: Something went wrong with map insert at line number " + std::to_string(linenumber));
+                }
+
+                ++linenumber;
             }
 
             PrintToConsole("INFO: map_daily_data_record.size() = " + std::to_string(daily_data_record::map_daily_data_record.size()));
@@ -653,25 +834,47 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
 
 }
 
-int main()
+int main(int argc, char* argv[])
 {
     int error = false;
 
+    try
+    {
+         ParseParameters(argc, argv);
+
+        if (mapArgs.count("-?") || mapArgs.count("-help"))
+        {
+            std::string strUsage = (std::string) "COVID-19_filter [params]\n"
+                    + "<-basedatadir=pathspec>             : The base directory path for the repos\n"
+                    + "<-srcglobal=relpathspec>            : The relative path to the global data source files\n"
+                    + "<-srcdaily=relpathspec>             : The relative path to the daily data source files\n"
+                    + "<-srcintraday=relpathspec           : The relative path to the intraday (HEAD) data file\n"
+                    + "<-destglobal=relpathspec>           : The relative path for the global filtered output\n"
+                    + "<-destdailyandintraday=relpathspec> : The relative path for the daily and HEAD filtered output\n";
+
+            PrintToConsole(strUsage);
+            return error;
+        }
+    }
+    catch (std::exception& e) {
+        PrintToConsole("ERROR: Exception parsing command line parameters");
+    }
+
     fs::path source_path;
     fs::path destination_path;
-    fs::path data_dir = "/home/jco/builds/";
+    fs::path data_dir = GetArg("-basedatadir", ".");
 
     std::map<std::string, std::pair<std::string, std::string>> source_file_spec;
     std::map<std::string, std::pair<std::string, std::string>> destination_file_spec;
     std::vector<std::pair<std::string, std::string>> source_file_type;
 
-    source_file_spec["global"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_", "_global.csv");
-    source_file_spec["daily"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_daily_reports", ".csv");
-    source_file_spec["intraday"] = std::make_pair("COVID-19_web-data/data/", ".csv");
+    source_file_spec["global"] = std::make_pair(GetArg("-srcglobal", "COVID-19/csse_covid_19_data/csse_covid_19_time_series") + "/time_series_covid19_", "_global.csv");
+    source_file_spec["daily"] = std::make_pair(GetArg("-srcdaily", "COVID-19/csse_covid_19_data/csse_covid_19_daily_reports"), ".csv");
+    source_file_spec["intraday"] = std::make_pair(GetArg("-srcintraday", "COVID-19_web-data/data"), ".csv");
 
-    destination_file_spec["global"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_time_series/filtered_", "_output.csv");
-    destination_file_spec["daily"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/filtered_", "_output.csv");
-    destination_file_spec["intraday"] = std::make_pair("COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/filtered_", "_output.csv");
+    destination_file_spec["global"] = std::make_pair(GetArg("-destglobal", "COVID-19/csse_covid_19_data/csse_covid_19_time_series/filtered_"), "_output.csv");
+    destination_file_spec["daily"] = std::make_pair(GetArg("-destdailyandintraday", "COVID-19/csse_covid_19_data/csse_covid_19_daily_reports/filtered_"), "_output.csv");
+    destination_file_spec["intraday"] = destination_file_spec["daily"];
 
     // A little kludgy. The global files are three different categories,
     // while the daily files are one per day and taken care of with an
@@ -690,7 +893,6 @@ int main()
 
     // Start with a fresh file at first.
     bool append = false;
-
 
     for (const auto& entry : source_file_type)
     {
@@ -791,7 +993,7 @@ int main()
         else if (entry.first == "intraday")
         {
             // Set source path for the intraday file.
-            source_path = data_dir / (fs::path) (source_file_spec_entry->second.first + entry.second + source_file_spec_entry->second.second);
+            source_path = data_dir / (fs::path) (source_file_spec_entry->second.first + "/" + entry.second + source_file_spec_entry->second.second);
 
             // The destination path here is put on top of the daily output, because the intraday update is really the "head"
             // of the daily files...
