@@ -565,8 +565,7 @@ std::vector<std::string> daily_data_record::header = {"FIPS",
                                                       "Active",
                                                       "Combined_Key"};
 
-std::vector<boost::gregorian::date> daily_data_record::blacklist = {boost::gregorian::date(2020,3,11),
-                                                                   boost::gregorian::date(2020,3,13)};
+std::vector<boost::gregorian::date> daily_data_record::blacklist {};
 
 std::map<daily_data_record::Key, daily_data_record, daily_data_record::KeyComp> daily_data_record::map_daily_data_record {};
 
@@ -845,12 +844,13 @@ int main(int argc, char* argv[])
         if (mapArgs.count("-?") || mapArgs.count("-help"))
         {
             std::string strUsage = (std::string) "COVID-19_filter [params]\n"
-                    + "<-basedatadir=pathspec>             : The base directory path for the repos\n"
-                    + "<-srcglobal=relpathspec>            : The relative path to the global data source files\n"
-                    + "<-srcdaily=relpathspec>             : The relative path to the daily data source files\n"
-                    + "<-srcintraday=relpathspec           : The relative path to the intraday (HEAD) data file\n"
-                    + "<-destglobal=relpathspec>           : The relative path for the global filtered output\n"
-                    + "<-destdailyandintraday=relpathspec> : The relative path for the daily and HEAD filtered output\n";
+                    + "<-basedatadir=pathspec>                        : The base directory path for the repos\n"
+                    + "<-srcglobal=relpathspec>                       : The relative path to the global data source files\n"
+                    + "<-srcdaily=relpathspec>                        : The relative path to the daily data source files\n"
+                    + "<-srcintraday=relpathspec                      : The relative path to the intraday (HEAD) data file\n"
+                    + "<-destglobal=relpathspec>                      : The relative path for the global filtered output\n"
+                    + "<-destdailyandintraday=relpathspec>            : The relative path for the daily and HEAD filtered output\n"
+                    + "<-dailyblacklist=\"yyyy-mm-dd,yyy-mm-dd ...\" : A list of daily files to exclude from processing\n";
 
             PrintToConsole(strUsage);
             return error;
@@ -890,6 +890,46 @@ int main(int argc, char* argv[])
     source_file_type.push_back(std::make_pair("intraday", "cases"));
 
     if (fDebug) PrintToConsole("INFO: source file type count = " + std::to_string(source_file_type.size()));
+
+    std::vector<std::string> v_blacklist = split(GetArg("-dailyblacklist",""), ",");
+
+    if (!(v_blacklist.size() == 1 && v_blacklist[0] == ""))
+    {
+        // Process the daily file blacklist
+        for (const auto& element : v_blacklist)
+        {
+            std::vector<std::string> v_date;
+            std::string date_out;
+            std::string century = "";
+
+            try {
+                if (element.find("/") != std::string::npos)
+                {
+                    // The date has slashes.
+                    v_date = split(element, "/");
+
+                    // Change the date order to yyyy-m-d and add time.
+                    if (v_date[2].size() < 4) century = "20";
+                    date_out = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1];
+                }
+                else if (element.find("-") != std::string::npos)
+                {
+                    // the date has dashes and is already in the right order.
+                    date_out = element;
+                }
+                else throw exception();
+            } catch (...) {
+                PrintToConsole("ERROR: Bad date provided in daily blacklist.");
+            }
+
+            boost::gregorian::date blacklist_date(boost::gregorian::from_string(date_out));
+
+            daily_data_record::blacklist.push_back(blacklist_date);
+
+            PrintToConsole("INFO: Added date " + boost::gregorian::to_iso_string(blacklist_date) + " to blacklist.");
+        }
+    }
+
 
     // Start with a fresh file at first.
     bool append = false;

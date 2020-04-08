@@ -54,7 +54,8 @@ OBJECTS_DIR   = ./
 
 SOURCES       = main.cpp 
 OBJECTS       = main.o
-DIST          = /home/jco/Qt/mkspecs/features/spec_pre.prf \
+DIST          = README.md \
+		/home/jco/Qt/mkspecs/features/spec_pre.prf \
 		/home/jco/Qt/mkspecs/common/unix.conf \
 		/home/jco/Qt/mkspecs/common/linux.conf \
 		/home/jco/Qt/mkspecs/common/sanitize.conf \
