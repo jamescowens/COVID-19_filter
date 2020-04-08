@@ -9,3 +9,6 @@ LIBS += -L/home/jco/local/boost/lib -lboost_system -lboost_filesystem -lboost_pr
 QMAKE_CXXFLAGS += -std=c++11
 SOURCES += \
         main.cpp
+
+DISTFILES += \
+    README.md
