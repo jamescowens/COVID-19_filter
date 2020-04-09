@@ -850,7 +850,7 @@ int main(int argc, char* argv[])
                     + "<-srcintraday=relpathspec                      : The relative path to the intraday (HEAD) data file\n"
                     + "<-destglobal=relpathspec>                      : The relative path for the global filtered output\n"
                     + "<-destdailyandintraday=relpathspec>            : The relative path for the daily and HEAD filtered output\n"
-                    + "<-dailyblacklist=\"yyyy-mm-dd,yyy-mm-dd ...\" : A list of daily files to exclude from processing\n";
+                    + "<-dailyblacklist=\"yyyy-mm-dd,yyy-mm-dd ...\"    : A list of daily files to exclude from processing\n";
 
             PrintToConsole(strUsage);
             return error;
