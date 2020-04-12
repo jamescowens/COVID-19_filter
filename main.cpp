@@ -287,6 +287,11 @@ public:
     int Recovered;
     int Active;
     std::string Combined_Key;
+    double Incident_Rate;
+    int People_Tested;
+    int People_Hospitalized;
+    int UID;
+    std::string ISO3;
 
     struct Key
     {
@@ -325,9 +330,9 @@ public:
     daily_data_record() {}
 
     // Normal constructor for daily_data_record which loads the content of the read text line into the variables.
-    daily_data_record(boost::gregorian::date file_date, std::string input_line)
+    daily_data_record(boost::gregorian::date file_date, std::string source_file_type, std::string input_line)
     {
-        source_version = GetVersion(file_date);
+        source_version = GetVersion(file_date, source_file_type);
 
         if (fDebug) PrintToConsole("INFO: Version = " + std::to_string(source_version));
 
@@ -442,6 +447,52 @@ public:
 
             break;
 
+        case 4:
+            Province_State = v_line[0];
+            Country_Region = v_line[1];
+
+            v_datetime = split(v_line[2], " ");
+
+            if (v_line[2].find("/") != std::string::npos)
+            {
+                // The date has slashes.
+                v_date = split(v_datetime[0], "/");
+
+                // Change the date order to yyyy-m-d and add time.
+                if (v_date[2].size() < 4) century = "20";
+                datetime = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1] + " " + v_datetime[1];
+            }
+            else if (v_line[2].find("-") != std::string::npos)
+            {
+                // the date has dashes and is already in the right order.
+                datetime = v_datetime[0] + " " + v_datetime[1];
+            }
+            else throw exception();
+
+            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
+
+            Last_Update = boost::posix_time::time_from_string(datetime);
+            Date = Last_Update.date();
+
+            Lat = StringToDouble(v_line[3]);
+            Long = StringToDouble(v_line[4]);
+            Confirmed = StringToInt(v_line[5]);
+            Deaths = StringToInt(v_line[6]);
+            Recovered = StringToInt(v_line[7]);
+            Active = StringToInt(v_line[8]);
+            Admin2 = v_line[9];
+            FIPS = v_line[10];
+
+            Combined_Key = v_line[11];
+
+            Incident_Rate = StringToDouble(v_line[12]);
+            People_Tested = StringToInt(v_line[13]);
+            People_Hospitalized = StringToInt(v_line[14]);
+            UID = StringToInt(v_line[15]);
+            ISO3 = v_line[16];
+
+            break;
+
         }
 
     }
@@ -485,7 +536,7 @@ public:
     }
 
 
-    unsigned int GetVersion(boost::gregorian::date file_date)
+    unsigned int GetVersion(boost::gregorian::date file_date, std::string source_file_type)
     {
         // Initial version is 0.
         unsigned int version = 0;
@@ -503,6 +554,11 @@ public:
         if (file_date >= boost::gregorian::date(2020,3,22))
         {
             version = 3;
+        }
+
+        if (file_date >= boost::gregorian::date(2020,4,12) && source_file_type == "intraday")
+        {
+            version = 4;
         }
 
         return version;
@@ -524,7 +580,12 @@ public:
                     + std::to_string(Deaths) + separator
                     + std::to_string(Recovered) + separator
                     + std::to_string(Active) + separator
-                    + Combined_Key;
+                    + Combined_Key
+                    + std::to_string(Incident_Rate) + separator
+                    + std::to_string(People_Tested) + separator
+                    + std::to_string(People_Hospitalized) + separator
+                    + std::to_string(UID) + separator
+                    + ISO3;
         }
         catch (...)
         {
@@ -563,7 +624,12 @@ std::vector<std::string> daily_data_record::header = {"FIPS",
                                                       "Deaths",
                                                       "Recovered",
                                                       "Active",
-                                                      "Combined_Key"};
+                                                      "Combined_Key",
+                                                      "Incident_Rate",
+                                                      "People_Tested",
+                                                      "People_Hospitalized",
+                                                      "UID",
+                                                      "ISO3"};
 
 std::vector<boost::gregorian::date> daily_data_record::blacklist {};
 
@@ -720,7 +786,7 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
 
                 try
                 {
-                    daily_data_record record(date, line);
+                    daily_data_record record(date, source_file_type_entry.first, line);
 
                     // Insert into the global map. Using the [] operator, and having the key have
                     //  the Date member, ensures that when there are multiple records on the same day,
@@ -763,7 +829,7 @@ bool ProcessSourceFile(fs::path source_file, std::pair<std::string, std::string>
 
                 try
                 {
-                    daily_data_record record(date, line);
+                    daily_data_record record(date, source_file_type_entry.first, line);
 
                     // Insert into the global map. Using the [] operator, and having the key have
                     //  the Date member, ensures that when there are multiple records on the same day,
