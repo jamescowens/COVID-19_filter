@@ -556,7 +556,7 @@ public:
             version = 3;
         }
 
-        if (file_date >= boost::gregorian::date(2020,4,12) || source_file_type == "intraday")
+        if (file_date >= boost::gregorian::date(2020,4,12) && source_file_type == "intraday")
         {
             version = 4;
         }
