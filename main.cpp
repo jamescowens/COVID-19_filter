@@ -493,6 +493,52 @@ public:
 
             break;
 
+        case 5:
+            FIPS = v_line[0];
+            Admin2 = v_line[1];
+            Province_State = v_line[2];
+            Country_Region = v_line[3];
+
+            v_datetime = split(v_line[4], " ");
+
+            if (v_line[4].find("/") != std::string::npos)
+            {
+                // The date has slashes.
+                v_date = split(v_datetime[0], "/");
+
+                // Change the date order to yyyy-m-d and add time.
+                if (v_date[2].size() < 4) century = "20";
+                datetime = century + v_date[2] +"-" + v_date[0] + "-" + v_date[1] + " " + v_datetime[1];
+            }
+            else if (v_line[4].find("-") != std::string::npos)
+            {
+                // the date has dashes and is already in the right order.
+                datetime = v_datetime[0] + " " + v_datetime[1];
+            }
+            else throw exception();
+
+            if (fDebug) PrintToConsole("INFO: datetime = " + datetime);
+
+            Last_Update = boost::posix_time::time_from_string(datetime);
+
+            Last_Update = boost::posix_time::time_from_string(datetime);
+
+            boost::gregorian::date_duration date_offset(-1);
+
+            Date = Last_Update.date();
+
+            Date += date_offset;
+
+            Lat = StringToDouble(v_line[5]);
+            Long = StringToDouble(v_line[6]);
+            Confirmed = StringToInt(v_line[7]);
+            Deaths = StringToInt(v_line[8]);
+            Recovered = StringToInt(v_line[9]);
+            Active = StringToInt(v_line[10]);
+
+            Combined_Key = v_line[11];
+
+            break;
         }
 
     }
@@ -541,24 +587,31 @@ public:
         // Initial version is 0.
         unsigned int version = 0;
 
-        if (file_date >= boost::gregorian::date(2020,2,2))
-        {
-            version = 1;
-        }
-
-        if (file_date >= boost::gregorian::date(2020,3,1))
-        {
-            version = 2;
-        }
-
-        if (file_date >= boost::gregorian::date(2020,3,22))
-        {
-            version = 3;
-        }
-
-        if (file_date >= boost::gregorian::date(2020,4,12) && source_file_type == "intraday")
+        if (source_file_type == "intraday")
         {
             version = 4;
+        }
+        else
+        {
+            if (file_date >= boost::gregorian::date(2020,2,2))
+            {
+                version = 1;
+            }
+
+            if (file_date >= boost::gregorian::date(2020,3,1))
+            {
+                version = 2;
+            }
+
+            if (file_date >= boost::gregorian::date(2020,3,22))
+            {
+                version = 3;
+            }
+
+            if (file_date >= boost::gregorian::date(2020,4,23))
+            {
+                version = 5;
+            }
         }
 
         return version;
